@@ -3,7 +3,32 @@
 #include <filesystem>
 #include <fstream>
 #include <sstream>
-#include <openssl/sha.h>
+#include <iostream>
+#include <iomanip>
+#include <vector>
+
+
+
+
+
+
+std::string hashBinaryContent(const uint8_t* data, size_t size) {
+    const uint64_t FNV_prime = 1099511628211u;
+    const uint64_t FNV_offset_basis = 14695981039346656037u;
+
+    uint64_t hash = FNV_offset_basis;
+
+    for (size_t i = 0; i < size; ++i) {
+        hash ^= static_cast<uint64_t>(data[i]);
+        hash *= FNV_prime;
+    }
+
+    // Превръщане на хеша в низ (hex)
+    std::ostringstream oss;
+    oss << std::hex << std::setfill('0') << std::setw(16) << hash;
+    return oss.str();
+}
+
 
 // Структура за представяне на файл
 struct FileRecord {
@@ -11,27 +36,22 @@ struct FileRecord {
     std::string hash;        // Хеш на съдържанието
     size_t size;             // Размер на файла
     std::time_t lastModified; // Дата на последна промяна
+    
 };
 
 // Хранилище
 class Repository {
 private:
     // Хеш таблица: хеш -> съдържание
-    std::unordered_map<std::string, std::string> contentTable;
+    std::unordered_map<std::string, uint8_t*> contentTable;
 
     // Метаданни за файловете
     std::vector<FileRecord> fileRecords;
 
     // Хеширане на съдържание
-    std::string hashContent(const std::string& content) {
-        unsigned char hash[SHA256_DIGEST_LENGTH];
-        SHA256(reinterpret_cast<const unsigned char*>(content.c_str()), content.size(), hash);
-
-        std::stringstream ss;
-        for (unsigned char byte : hash) {
-            ss << std::hex << std::setw(2) << std::setfill('0') << (int)byte;
-        }
-        return ss.str();
+    std::string hashContent(const uint8_t* data, size_t size) {
+        std::string result = hashBinaryContent(data, size);
+        return result;
     }
 
 public:
@@ -44,25 +64,45 @@ public:
             return;
         }
 
-        std::ostringstream contentStream;
-        contentStream << file.rdbuf();
-        std::string content = contentStream.str();
+        std::ifstream file(filePath, std::ios::binary);
+        if (!file) {
+            std::cerr << "Failed to open the file: " << filePath << "\n";
+            return;
+        }
+
+        // Определяне на размера на файла
+        file.seekg(0, std::ios::end); // Премести указателя в края на файла
+        size_t size = file.tellg();  // Определи текущата позиция (размера на файла)
+        file.seekg(0, std::ios::beg); // Върни указателя в началото на файла
+
+        // Създай буфер за съдържанието на файла
+        std::vector<uint8_t> buffer(size);
+
+        // Прочети съдържанието на файла
+        if (!file.read(reinterpret_cast<char*>(buffer.data()), size)) {
+            std::cerr << "Failed to read the file content.\n";
+            return;
+        }
+
         file.close();
+                
+        uint8_t* data = buffer.data(); 
 
         // Хеширане на съдържанието
-        std::string fileHash = hashContent(content);
+        std::string fileHash = hashContent(data,  size);
 
         // Проверка дали файлът вече съществува
-        if (contentTable.find(fileHash) == contentTable.end()) {
-            // Добавяне на уникалното съдържание в хеш таблицата
-            contentTable[fileHash] = content;
+        if (contentTable.find(fileHash) == contentTable.end())
+        {
+           
+            contentTable[fileHash] = data;
         }
 
         // Добавяне на запис за файла
         fileRecords.push_back({
             filePath.string(),
             fileHash,
-            content.size(),
+            size,
             std::filesystem::last_write_time(filePath).time_since_epoch().count()
             });
     }
