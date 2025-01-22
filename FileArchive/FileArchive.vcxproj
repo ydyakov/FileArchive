@@ -130,6 +130,15 @@
   <ItemGroup>
     <ClCompile Include="FileArchive.cpp" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="json\Carosels.sql" />
+    <None Include="json\Config.json" />
+    <None Include="json\data.json" />
+    <None Include="json\Example.json" />
+  </ItemGroup>
+  <ItemGroup>
+    <Xml Include="json\Example.xml" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

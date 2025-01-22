@@ -1,0 +1,25 @@
+{
+  "query":
+  {
+     "bool": 
+     {
+       "must":[
+          {"match": {"productType": "Gift Card"}},
+          {"match": { "name": "AMC $25 Physical Gift Card" }},
+          {"match": { "brand": "AMC" }},
+          {"match": { "supplierType": "CMT" }},
+          {"match": { "augeoCategory1": "2" }},
+          {"range": {"endUserPrice": {"gte": 5.0, "lte": 11.0}}}
+        ],
+        "must_not": [
+          { "match": {"curatedListID": "169"}},
+          { "match": {"curatedListID": "170"}}
+        ]
+      }
+  },
+  "sort": [
+    {"name.keyword": "asc"}
+  ],
+  "from": 0,
+  "size": 2
+}

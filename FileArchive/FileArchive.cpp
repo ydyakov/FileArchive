@@ -64,12 +64,6 @@ public:
             return;
         }
 
-        std::ifstream file(filePath, std::ios::binary);
-        if (!file) {
-            std::cerr << "Failed to open the file: " << filePath << "\n";
-            return;
-        }
-
         // Определяне на размера на файла
         file.seekg(0, std::ios::end); // Премести указателя в края на файла
         size_t size = file.tellg();  // Определи текущата позиция (размера на файла)
@@ -115,33 +109,7 @@ public:
             return;
         }
 
-        // Записване на хеш таблицата
-        size_t tableSize = contentTable.size();
-        outFile.write(reinterpret_cast<const char*>(&tableSize), sizeof(tableSize));
-        for (const auto& [hash, content] : contentTable) {
-            size_t hashSize = hash.size();
-            size_t contentSize = content.size();
-
-            outFile.write(reinterpret_cast<const char*>(&hashSize), sizeof(hashSize));
-            outFile.write(hash.data(), hashSize);
-            outFile.write(reinterpret_cast<const char*>(&contentSize), sizeof(contentSize));
-            outFile.write(content.data(), contentSize);
-        }
-
-        // Записване на файловите записи
-        size_t recordCount = fileRecords.size();
-        outFile.write(reinterpret_cast<const char*>(&recordCount), sizeof(recordCount));
-        for (const auto& record : fileRecords) {
-            size_t pathSize = record.path.size();
-            size_t hashSize = record.hash.size();
-
-            outFile.write(reinterpret_cast<const char*>(&pathSize), sizeof(pathSize));
-            outFile.write(record.path.data(), pathSize);
-            outFile.write(reinterpret_cast<const char*>(&hashSize), sizeof(hashSize));
-            outFile.write(record.hash.data(), hashSize);
-            outFile.write(reinterpret_cast<const char*>(&record.size), sizeof(record.size));
-            outFile.write(reinterpret_cast<const char*>(&record.lastModified), sizeof(record.lastModified));
-        }
+        // ****
 
         outFile.close();
     }
@@ -169,7 +137,8 @@ public:
             std::string content(contentSize, '\0');
             inFile.read(content.data(), contentSize);
 
-            contentTable[hash] = content;
+            // **
+            contentTable[hash] = 0;
         }
 
         // Четене на файловите записи
@@ -207,7 +176,7 @@ int main() {
     repo.addFile("example2.txt");
 
     // Сериализация
-    repo.serialize("repository.dat");
+    //repo.serialize("repository.dat");
 
     // Десериализация
     Repository newRepo;
