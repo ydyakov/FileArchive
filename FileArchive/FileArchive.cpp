@@ -8,6 +8,13 @@
 
 namespace fs = std::filesystem;
 
+enum PathTypeState 
+{
+	Directory, 
+	File,      
+	Error      
+};
+
 struct FileRecord
 {
 	std::string path;
@@ -19,6 +26,45 @@ struct FileRecord
 
 struct Helpper
 {
+	static PathTypeState ensureDirectoryExists(fs::path inputPath) {
+		if (!fs::exists(inputPath))
+		{
+			fs::path dirPath = inputPath;
+
+			if (fs::is_regular_file(inputPath) || inputPath.has_extension())
+			{
+				dirPath = inputPath.parent_path();
+			}
+			try {
+				if (!fs::exists(dirPath))
+				{
+					if (fs::create_directories(dirPath))
+					{
+						std::cout << "Created directories for path: " << dirPath << '\n';
+					}
+					else
+					{
+						std::cerr << "Failed to create directories for path: " << dirPath << '\n';
+						return PathTypeState::Error;
+					}
+				}
+			}
+			catch (const fs::filesystem_error& e)
+			{
+				std::cerr << "Error: " << e.what() << '\n';
+				return PathTypeState::Error;;
+			}
+		}
+	
+		
+		if (fs::is_directory(inputPath))
+		{
+			return PathTypeState::Directory;
+		}
+
+		return PathTypeState::File;
+	}
+
 	// Сериализация на FileRecord
 	static void serializeFileRecord(const FileRecord& record, std::ofstream& outStream) {
 		// Сериализация на `path`
@@ -166,9 +212,11 @@ public:
 		}
 	}
 
-	void restoreToFileSystem(fs::path& dirPath)
+	void restoreFileToFileSystem(std::string dirPathString)
 	{
-		if (!fs::exists(dirPath) || !fs::is_directory(dirPath))
+		fs::path dirPath = dirPathString;
+
+		if (Helpper::ensureDirectoryExists(dirPath) != PathTypeState::Directory)
 		{
 			std::cerr << "Пътят не е валидна директория: " << dirPath << std::endl;
 			return;
@@ -177,6 +225,10 @@ public:
 		for (auto [hash, fileRecord] : fileTable)
 		{
 			fs::path fullPath = dirPath / fileRecord.path;
+			if (!Helpper::ensureDirectoryExists(fullPath))
+			{
+				continue;
+			}
 			std::ofstream outStream(fullPath, std::ios::binary);
 			if (!outStream.is_open()) {
 				std::cerr << "Неуспешно отваряне на файла: " << fullPath << std::endl;
@@ -249,7 +301,7 @@ int main() {
 	repo.importAllFromFileSystem("json");
 	repo.serializeToArchive("archive/record.bin");
 	repo.deserializeFromArchive("archive/record.bin");
-	repo.deserializeFromArchive("archive");
+	repo.restoreFileToFileSystem("archive");
 
 	return 0;
 }
