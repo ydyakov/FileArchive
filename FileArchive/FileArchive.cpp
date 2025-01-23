@@ -26,7 +26,7 @@ struct FileRecord
 
 struct Helpper
 {
-	static PathTypeState ensureDirectoryExists(fs::path inputPath) {
+	static PathTypeState ensureDirectoryExists(const fs::path& inputPath) {
 		if (!fs::exists(inputPath))
 		{
 			fs::path dirPath = inputPath;
