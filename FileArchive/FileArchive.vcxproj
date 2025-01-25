@@ -132,7 +132,6 @@
     <ClCompile Include="backup.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="archive\record.bin" />
     <None Include="json\Carosels.sql" />
     <None Include="json\Config.json" />
     <None Include="json\data.json" />

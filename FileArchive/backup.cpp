@@ -42,7 +42,7 @@ struct CommandParameter
 {
 	Command action;
 	std::string archive;
-	std::string dirPath;
+	std::vector<std::string> dirPaths;
 	bool hashOnlyFlag = false;
 };
 
@@ -51,14 +51,19 @@ struct Helpper
 {
 	static CommandParameter ComputeAcction(int argc, char* argv[]) {
 		CommandParameter result;
-		if (argc < 3) {
+		if (argc < 3) 
+		{
 			std::cerr << "Use: backup.exe create|extract|check|update  hash-only? <name> <directory>+" << std::endl;
 			result.action = Command::ERROR;
 			return result;
 		}
 				
 		std::string command = argv[1];
-
+		std::transform(command.begin(), command.end(), command.begin(), [](unsigned char c) 
+		{
+			return std::tolower(c); 
+		});
+		
 		if (command != "create" && command != "update" && command != "check" && command != "extract") {
 			std::cerr << "Use: backup.exe create|extract|check|update hash-only? <name> <directory>+" << std::endl;
 			result.action = Command::ERROR;
@@ -83,12 +88,14 @@ struct Helpper
 		}
 
 		int index = 2; 
-		if (std::string(argv[2]) == "hash-only") {
+		if (std::string(argv[2]) == "hash-only") 
+		{
 			result.hashOnlyFlag = true;
 			index++;
 		}
 				
-		if (index >= argc) {
+		if (index >= argc) 
+		{
 			std::cerr << "Error: Missing <name> parameter." << std::endl;
 			result.action = Command::ERROR;
 			return result;
@@ -102,7 +109,10 @@ struct Helpper
 			return result;
 		}
 
-		result.dirPath = argv[index];
+		for (int i = index; i < argc; ++i) 
+		{
+			result.dirPaths.push_back(argv[i]);
+		}
 
 		return result;
 	}
@@ -116,28 +126,28 @@ struct Helpper
 			{
 				dirPath = inputPath.parent_path();
 			}
-			try {
+			try 
+			{
 				if (!fs::exists(dirPath))
 				{
 					if (fs::create_directories(dirPath))
 					{
-						std::cout << "Created directories for path: " << dirPath << '\n';
+						std::cout << "Created directories for path: " << dirPath << std::endl;
 					}
 					else
 					{
-						std::cerr << "Failed to create directories for path: " << dirPath << '\n';
+						std::cerr << "Failed to create directories for path: " << dirPath << std::endl;
 						return PathTypeState::Error;
 					}
 				}
 			}
 			catch (const fs::filesystem_error& e)
 			{
-				std::cerr << "Error: " << e.what() << '\n';
+				std::cerr << "Error: " << e.what() << std::endl;
 				return PathTypeState::Error;;
 			}
 		}
-	
-		
+			
 		if (fs::is_directory(inputPath))
 		{
 			return PathTypeState::Directory;
@@ -205,16 +215,16 @@ struct Helpper
 			record.filesMetadata.push_back({ path, lastModified });
 		}
 
-		// Десериализация на `hash`
+		// Десериализация на hash
 		size_t hashLength;
 		inStream.read(reinterpret_cast<char*>(&hashLength), sizeof(hashLength));
 		record.hash.resize(hashLength);
 		inStream.read(record.hash.data(), hashLength);
 
-		// Десериализация на `size`
+		// Десериализация на size
 		inStream.read(reinterpret_cast<char*>(&record.size), sizeof(record.size));
 		
-		// Десериализация на `data`
+		// Десериализация на data
 		size_t dataLength;
 		inStream.read(reinterpret_cast<char*>(&dataLength), sizeof(dataLength));
 		record.data.resize(dataLength);
@@ -278,8 +288,31 @@ private:
 				buffer.size(),
 				buffer
 			};
-			fileTable[fileHash].filesMetadata.push_back({ filePath.string() , std::filesystem::last_write_time(filePath).time_since_epoch().count() });
 		}
+
+		auto fileMetadata = std::find_if(fileTable[fileHash].filesMetadata.begin(), fileTable[fileHash].filesMetadata.end(), [&](const FileMetadata& file) 
+		{
+			return file.path == filePath;
+		});
+
+		if (fileMetadata == fileTable[fileHash].filesMetadata.end()) 
+		{
+			size_t count = fileTable[fileHash].filesMetadata.size();
+			if (count == 0)
+			{
+				std::cout << "Added unique file to archive: Hash: " << fileHash << " File: " << filePath << std::endl;
+			}
+			else
+			{
+				std::cout << "Added non unique file to archive: "<< count + 1 << " copies toral Hash: " << fileHash <<  " File : " << filePath << std::endl;
+			}
+
+		}
+		else 
+		{
+			std::cout << "The same file with same path already in achive Hash: " << fileHash << " File: " << filePath << std::endl;
+		}
+
 		fileTable[fileHash].filesMetadata.push_back({ filePath.string() , std::filesystem::last_write_time(filePath).time_since_epoch().count() });
 	}
 
@@ -336,11 +369,12 @@ public:
 				std::ofstream outStream(fullPath, std::ios::binary);
 				if (!outStream.is_open()) {
 					std::cerr << "Неуспешно отваряне на файла: " << fullPath << std::endl;
+					continue;
 				}
 
 				outStream.write(fileRecord.data.data(), fileRecord.data.size());
-
 				outStream.close();
+				std::cout << "Restore to file sysytem: " << fullPath << std::endl;
 			}
 		}
 	}
@@ -348,7 +382,7 @@ public:
 	void serializeToArchive(const std::string& fileName) {
 		std::ofstream outStream(fileName, std::ios::binary);
 		if (!outStream.is_open()) {
-			std::cerr << "Неуспешно записване на архива\n";
+			std::cerr << "Неуспешно записване на архива" << std::endl;
 			return;
 		}
 
@@ -370,7 +404,7 @@ public:
 
 		std::ifstream inStream(fileName, std::ios::binary);
 		if (!inStream.is_open()) {
-			std::cerr << "Неуспешно отваряне на архива\n";
+			std::cerr << "Неуспешно отваряне на архива" << std::endl;
 			return;
 		}
 
@@ -400,32 +434,37 @@ int main(int argc, char* argv[]) {
 
 	if (command.action == Command::UPDATE)
 	{
-		std::cout << "update " << command.archive << " " << command.dirPath << std::endl;
+		Repository repo;
+		repo.deserializeFromArchive(command.archive);
+		for (std::string dirPath : command.dirPaths)
+		{
+			repo.importAllFromFileSystem(dirPath);
+		}
+		repo.serializeToArchive(command.archive);
 	}
 	else if (command.action == Command::CREATE)
 	{
 		Repository repo;
-		repo.importAllFromFileSystem(command.dirPath);
+		for (std::string dirPath : command.dirPaths)
+		{
+			repo.importAllFromFileSystem(dirPath);
+		}
 		repo.serializeToArchive(command.archive);
 	}
 	else if (command.action == Command::CHECK)
 	{
-		std::cout << "check " << command.archive << " " << command.dirPath << std::endl;
+		Repository repo;
+		repo.deserializeFromArchive(command.archive);
+		repo.importAllFromFileSystem(command.dirPaths[0]);
+		
 	}
 	else if (command.action == Command::EXTRACT)
 	{
 		Repository repo;
 		repo.deserializeFromArchive(command.archive);
-		repo.restoreFileToFileSystem(command.dirPath);
+		repo.restoreFileToFileSystem(command.dirPaths[0]);
 		
 	}
-
-	/*Repository repo;
-
-	repo.importAllFromFileSystem("json");
-	repo.serializeToArchive("archive/record.bin");
-	repo.deserializeFromArchive("archive/record.bin");
-	repo.restoreFileToFileSystem("archive");*/
 
 	return 0;
 }
