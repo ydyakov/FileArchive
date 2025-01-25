@@ -233,6 +233,16 @@ struct Helpper
 		return record;
 	}
 
+	static void CompareFileTables(std::unordered_map<std::string, UniqueFileRecord> archive, std::unordered_map<std::string, UniqueFileRecord> fileSysytem)
+	{
+		std::vector<std::string> uniqueInArchive;
+		std::vector<std::string> uniqueInFileSystem;
+		std::vector<std::string> matches;
+		
+		
+
+	}
+
 	static std::string hashBinaryContent(const std::vector<char>& data) {
 		const uint64_t FNV_prime = 1099511628211u;
 		const uint64_t FNV_offset_basis = 14695981039346656037u;
@@ -318,6 +328,11 @@ private:
 
 public:
 
+	std::unordered_map<std::string, UniqueFileRecord> GetFileTable()
+	{
+		return fileTable;
+	}
+   
 	void importAllFromFileSystem(const fs::path& path)
 	{
 		std::vector<fs::path> files;
@@ -453,9 +468,14 @@ int main(int argc, char* argv[]) {
 	}
 	else if (command.action == Command::CHECK)
 	{
-		Repository repo;
-		repo.deserializeFromArchive(command.archive);
-		repo.importAllFromFileSystem(command.dirPaths[0]);
+		Repository archive;
+		Repository fileSystem;
+		archive.deserializeFromArchive(command.archive);
+		for (std::string dirPath : command.dirPaths)
+		{
+			fileSystem.importAllFromFileSystem(dirPath);
+		}
+		Helpper::CompareFileTables(archive.GetFileTable(), fileSystem.GetFileTable());
 		
 	}
 	else if (command.action == Command::EXTRACT)
