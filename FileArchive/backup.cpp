@@ -49,7 +49,7 @@ struct CommandParameter
 
 struct Helpper
 {
-	static CommandParameter ComputeAcction(int argc, char* argv[]) {
+	static CommandParameter computeAcction(int argc, char* argv[]) {
 		CommandParameter result;
 		if (argc < 3) 
 		{
@@ -233,11 +233,37 @@ struct Helpper
 		return record;
 	}
 
-	static void CompareFileTables(std::unordered_map<std::string, UniqueFileRecord> archive, std::unordered_map<std::string, UniqueFileRecord> fileSysytem)
+	static void compareFileTables(std::unordered_map<std::string, UniqueFileRecord> archive, std::unordered_map<std::string, UniqueFileRecord> fileSysytem)
 	{
-		std::vector<std::string> uniqueInArchive;
-		std::vector<std::string> uniqueInFileSystem;
-		std::vector<std::string> matches;
+		std::cout << " -------------- Files only in archive: -----------------------" << std::endl;
+		for (auto [path, fileRecord] : archive)
+		{
+			if (fileSysytem.find(path) == fileSysytem.end())
+			{
+				std::cout << archive[path].filesMetadata[0].path << std::endl;
+			}
+		}
+		
+		std::cout << " -------------- Files only in file sysytem: -----------------------" << std::endl;
+		for (auto [path, fileRecord] : fileSysytem)
+		{
+			if (archive.find(path) == archive.end())
+			{
+				std::cout << fileSysytem[path].filesMetadata[0].path << std::endl;
+			}
+		}
+
+		std::cout << " -------------- common files: -----------------------" << std::endl;
+		for (auto [path, fileRecord] : fileSysytem)
+		{
+			
+			if (archive.find(path) != archive.end())
+			{
+				bool isEqual = archive[path].hash == fileSysytem[path].hash;
+				std::cout << archive[path].filesMetadata[0].path << (isEqual ? " - Identical  " : " - Diferent") << std::endl;
+			}
+		}
+
 	}
 
 	static std::string hashBinaryContent(const std::vector<char>& data) {
@@ -340,7 +366,7 @@ public:
 		{
 			if (!fs::exists(path) || !fs::is_directory(path))
 			{
-				std::cerr << "Пътят не е валидна директория: " << path << std::endl;
+				std::cerr << "Path is not valid directory: " << path << std::endl;
 				return;
 			}
 
@@ -352,7 +378,7 @@ public:
 			}
 		}
 		catch (const std::exception& e) {
-			std::cerr << "Грешка при обработка на директорията: " << e.what() << std::endl;
+			std::cerr << "Error with directory: " << e.what() << std::endl;
 		}
 
 		for (const fs::path filePath : files)
@@ -367,7 +393,7 @@ public:
 
 		if (Helpper::ensureDirectoryExists(dirPath) != PathTypeState::Directory)
 		{
-			std::cerr << "Пътят не е валидна директория: " << dirPath << std::endl;
+			std::cerr << "Path is not valid directory: " << dirPath << std::endl;
 			return;
 		}
 
@@ -382,7 +408,7 @@ public:
 				}
 				std::ofstream outStream(fullPath, std::ios::binary);
 				if (!outStream.is_open()) {
-					std::cerr << "Неуспешно отваряне на файла: " << fullPath << std::endl;
+					std::cerr << "Error in open file : " << fullPath << std::endl;
 					continue;
 				}
 
@@ -439,7 +465,7 @@ public:
 
 int main(int argc, char* argv[]) {
 	
-	CommandParameter command = Helpper::ComputeAcction(argc, argv);
+	CommandParameter command = Helpper::computeAcction(argc, argv);
 
 	if (command.action == Command::ERROR)
 	{
@@ -474,7 +500,8 @@ int main(int argc, char* argv[]) {
 		{
 			fileSystem.importAllFromFileSystem(dirPath);
 		}
-		Helpper::CompareFileTables(archive.GetFileTable(), fileSystem.GetFileTable());
+		std::system("cls");
+		Helpper::compareFileTables(archive.GetFileTable(), fileSystem.GetFileTable());
 		
 	}
 	else if (command.action == Command::EXTRACT)
