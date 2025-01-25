@@ -24,18 +24,18 @@ enum Command
 	ERROR
 };
 
-struct FileMetadata
+struct HashData
 {
-	std::string path;
-	std::time_t lastModified;
+	std::string hash;
+	size_t size;
+	std::vector<char> data;
 };
 
 struct UniqueFileRecord
 {
 	std::string hash;
-	size_t size;
-	std::vector<char> data;
-	std::vector<FileMetadata> filesMetadata;
+	std::string path;
+	std::time_t lastModified;
 };
 
 struct CommandParameter
@@ -159,22 +159,22 @@ struct Helpper
 	// Сериализация на UniqueFileRecord
 	static void serializeFileRecord(const UniqueFileRecord& record, std::ofstream& outStream) {
 		
-		// Сериализация на броя идентични файлове
-		size_t identicalFileCount = record.filesMetadata.size();
-		outStream.write(reinterpret_cast<const char*>(&identicalFileCount), sizeof(identicalFileCount));
-		
-		// Сериализация на filesMetadata
-		for (FileMetadata file : record.filesMetadata)
-		{
-			size_t pathLength = file.path.size();
-			// сериализация на path
-			outStream.write(reinterpret_cast<const char*>(&pathLength), sizeof(pathLength));
-			outStream.write(file.path.data(), pathLength);
+		size_t pathLength = record.path.size();
+		// сериализация на path
+		outStream.write(reinterpret_cast<const char*>(&pathLength), sizeof(pathLength));
+		outStream.write(record.path.data(), pathLength);
 
-			// Сериализация на `lastModified`
-			outStream.write(reinterpret_cast<const char*>(&file.lastModified), sizeof(file.lastModified));
+		// Сериализация на `lastModified`
+		outStream.write(reinterpret_cast<const char*>(&record.lastModified), sizeof(record.lastModified));
 
-		}
+		// Сериализация на hash
+		size_t hashLength = record.hash.size();
+		outStream.write(reinterpret_cast<const char*>(&hashLength), sizeof(hashLength));
+		outStream.write(record.hash.data(), hashLength);
+	}
+
+	// Сериализация на HashData
+	static void serializeHashData(const HashData& record, std::ofstream& outStream) {
 
 		// Сериализация на hash
 		size_t hashLength = record.hash.size();
@@ -183,37 +183,44 @@ struct Helpper
 
 		// Сериализация на size
 		outStream.write(reinterpret_cast<const char*>(&record.size), sizeof(record.size));
-				
+
 		// Сериализация на data
 		size_t dataLength = record.data.size();
 		outStream.write(reinterpret_cast<const char*>(&dataLength), sizeof(dataLength));
 		outStream.write(record.data.data(), dataLength);
-		
+
 	}
+
 
 	// Десериализация на FileRecord
 	static UniqueFileRecord deserializeFileRecord(std::ifstream& inStream) {
 		UniqueFileRecord record;
 
-		// Десериализация на броя идентични файлове
-		size_t identicalFileCount;
-		inStream.read(reinterpret_cast<char*>(&identicalFileCount), sizeof(identicalFileCount));
+		// Десериализация на path
+		size_t pathLength;
+		inStream.read(reinterpret_cast<char*>(&pathLength), sizeof(pathLength));
+		std::string path(pathLength, '\0');
+		inStream.read(path.data(), pathLength);
+		record.path = path;
 
-		// Десериализация на filesMetadata
-		for (int i = 0; i < identicalFileCount; i++)
-		{
-			// Десериализация на path
-			size_t pathLength;
-			inStream.read(reinterpret_cast<char*>(&pathLength), sizeof(pathLength));
-			std::string path(pathLength, '\0');
-			inStream.read(path.data(), pathLength);
+		// Десериализация на lastModified
+		std::time_t lastModified;
+		inStream.read(reinterpret_cast<char*>(&lastModified), sizeof(lastModified));
+		record.lastModified = lastModified;
+		
+		// Десериализация на hash
+		size_t hashLength;
+		inStream.read(reinterpret_cast<char*>(&hashLength), sizeof(hashLength));
+		record.hash.resize(hashLength);
+		inStream.read(record.hash.data(), hashLength);
 
-			// Десериализация на lastModified
-			std::time_t lastModified;
-			inStream.read(reinterpret_cast<char*>(&lastModified), sizeof(lastModified));
+		return record;
+	}
 
-			record.filesMetadata.push_back({ path, lastModified });
-		}
+	// Десериализация на HashData
+	static HashData deserializeHashData(std::ifstream& inStream)
+	{
+		HashData record;
 
 		// Десериализация на hash
 		size_t hashLength;
@@ -223,7 +230,7 @@ struct Helpper
 
 		// Десериализация на size
 		inStream.read(reinterpret_cast<char*>(&record.size), sizeof(record.size));
-		
+
 		// Десериализация на data
 		size_t dataLength;
 		inStream.read(reinterpret_cast<char*>(&dataLength), sizeof(dataLength));
@@ -240,7 +247,7 @@ struct Helpper
 		{
 			if (fileSysytem.find(path) == fileSysytem.end())
 			{
-				std::cout << archive[path].filesMetadata[0].path << std::endl;
+				std::cout << path << std::endl;
 			}
 		}
 		
@@ -249,18 +256,18 @@ struct Helpper
 		{
 			if (archive.find(path) == archive.end())
 			{
-				std::cout << fileSysytem[path].filesMetadata[0].path << std::endl;
+				std::cout << path << std::endl;
 			}
 		}
 
-		std::cout << " -------------- common files: -----------------------" << std::endl;
+		std::cout << " ----------------    common files:    --------------------------" << std::endl;
 		for (auto [path, fileRecord] : fileSysytem)
 		{
 			
 			if (archive.find(path) != archive.end())
 			{
 				bool isEqual = archive[path].hash == fileSysytem[path].hash;
-				std::cout << archive[path].filesMetadata[0].path << (isEqual ? " - Identical  " : " - Diferent") << std::endl;
+				std::cout << path << (isEqual ? " - Identical  " : " - Diferent") << std::endl;
 			}
 		}
 
@@ -288,7 +295,7 @@ class Repository
 private:
 	std::unordered_map<std::string, UniqueFileRecord> fileTable;
 
-	std::vector<UniqueFileRecord> fileRecords;
+	std::unordered_map<std::string, HashData> hashData;
 
 	void importFileFromFileSystem(const fs::path& filePath)
 	{
@@ -315,40 +322,28 @@ private:
 
 		std::string fileHash = Helpper::hashBinaryContent(buffer);
 
-		if (fileTable.find(fileHash) == fileTable.end())
+		if (fileTable.find(filePath.string()) == fileTable.end())
 		{
-			fileTable[fileHash] = UniqueFileRecord
+			fileTable[filePath.string()] = UniqueFileRecord
 			{
 				fileHash,
-				buffer.size(),
-				buffer
+				filePath.string(),
+				std::filesystem::last_write_time(filePath).time_since_epoch().count()
 			};
+			std::cout << "Added file to archive: Hash: " << fileHash << " File: " << filePath << std::endl;
 		}
-
-		auto fileMetadata = std::find_if(fileTable[fileHash].filesMetadata.begin(), fileTable[fileHash].filesMetadata.end(), [&](const FileMetadata& file) 
+		else if (fileHash != fileTable[filePath.string()].hash)
 		{
-			return file.path == filePath;
-		});
-
-		if (fileMetadata == fileTable[fileHash].filesMetadata.end()) 
-		{
-			size_t count = fileTable[fileHash].filesMetadata.size();
-			if (count == 0)
-			{
-				std::cout << "Added unique file to archive: Hash: " << fileHash << " File: " << filePath << std::endl;
-			}
-			else
-			{
-				std::cout << "Added non unique file to archive: "<< count + 1 << " copies toral Hash: " << fileHash <<  " File : " << filePath << std::endl;
-			}
-
+			fileTable[filePath.string()].hash = fileHash;
+			std::cout << "Update file to archive: new Hash: " << fileHash << " File: " << filePath << std::endl;
 		}
-		else 
+				
+		hashData[fileHash] = HashData
 		{
-			std::cout << "The same file with same path already in achive Hash: " << fileHash << " File: " << filePath << std::endl;
-		}
-
-		fileTable[fileHash].filesMetadata.push_back({ filePath.string() , std::filesystem::last_write_time(filePath).time_since_epoch().count() });
+			fileHash,
+			buffer.size(),
+			buffer
+		};
 	}
 
 public:
@@ -397,25 +392,26 @@ public:
 			return;
 		}
 
-		for (auto [hash, fileRecord] : fileTable)
+		for (auto [path, fileRecord] : fileTable)
 		{
-			for (FileMetadata file : fileRecord.filesMetadata)
+			
+			fs::path fullPath = dirPath / fileRecord.path;
+			if (!Helpper::ensureDirectoryExists(fullPath))
 			{
-				fs::path fullPath = dirPath / file.path;
-				if (!Helpper::ensureDirectoryExists(fullPath))
-				{
-					continue;
-				}
-				std::ofstream outStream(fullPath, std::ios::binary);
-				if (!outStream.is_open()) {
-					std::cerr << "Error in open file : " << fullPath << std::endl;
-					continue;
-				}
-
-				outStream.write(fileRecord.data.data(), fileRecord.data.size());
-				outStream.close();
-				std::cout << "Restore to file sysytem: " << fullPath << std::endl;
+				continue;
 			}
+			std::ofstream outStream(fullPath, std::ios::binary);
+			if (!outStream.is_open()) {
+				std::cerr << "Error in open file : " << fullPath << std::endl;
+				continue;
+			}
+
+			HashData hashDataRecord = hashData[fileRecord.hash];
+
+			outStream.write(hashDataRecord.data.data(), hashDataRecord.data.size());
+			outStream.close();
+			std::cout << "Restore to file sysytem: " << fullPath << std::endl;
+			
 		}
 	}
 
@@ -426,7 +422,7 @@ public:
 			return;
 		}
 
-		// first save the size of file table
+		// save the size of file table
 		size_t filesCount = static_cast<size_t>(fileTable.size());
 		outStream.write(reinterpret_cast<const char*>(&filesCount), sizeof(filesCount));
 
@@ -435,12 +431,22 @@ public:
 			Helpper::serializeFileRecord(fileRecord, outStream);
 		}
 
+		// save the size of hash data
+		size_t hashCount = static_cast<size_t>(hashData.size());
+		outStream.write(reinterpret_cast<const char*>(&hashCount), sizeof(hashCount));
+
+		for (const auto& [hash, hashRecord] : hashData)
+		{
+			Helpper::serializeHashData(hashRecord, outStream);
+		}
+
 		outStream.close();
 	}
 
 	void deserializeFromArchive(const std::string& fileName)
 	{
 		fileTable.clear();
+		hashData.clear();
 
 		std::ifstream inStream(fileName, std::ios::binary);
 		if (!inStream.is_open()) {
@@ -448,14 +454,24 @@ public:
 			return;
 		}
 
-		// first read the size of file table
+		// read the size of file table
 		size_t filesCount;
 		inStream.read(reinterpret_cast<char*>(&filesCount), sizeof(filesCount));
 
 		for (int i = 0; i < filesCount; i++)
 		{
 			UniqueFileRecord fileRecord = Helpper::deserializeFileRecord(inStream);
-			fileTable[fileRecord.hash] = fileRecord;
+			fileTable[fileRecord.path] = fileRecord;
+		}
+
+		// read the size of hash data
+		size_t hashDataCount;
+		inStream.read(reinterpret_cast<char*>(&hashDataCount), sizeof(hashDataCount));
+
+		for (int i = 0; i < hashDataCount; i++)
+		{
+			HashData hashRecord = Helpper::deserializeHashData(inStream);
+			hashData[hashRecord.hash] = hashRecord;
 		}
 
 		inStream.close();
