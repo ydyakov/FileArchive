@@ -238,9 +238,6 @@ struct Helpper
 		std::vector<std::string> uniqueInArchive;
 		std::vector<std::string> uniqueInFileSystem;
 		std::vector<std::string> matches;
-		
-		
-
 	}
 
 	static std::string hashBinaryContent(const std::vector<char>& data) {
@@ -270,8 +267,9 @@ private:
 	void importFileFromFileSystem(const fs::path& filePath)
 	{
 		std::ifstream inputFile(filePath, std::ios::binary);
-		if (!inputFile) {
-			std::cerr << "Неуспешно отваряне на файла: " << filePath << std::endl;
+		if (!inputFile) 
+		{
+			std::cerr << "Error on open file: " << filePath << std::endl;
 			return;
 		}
 
@@ -281,8 +279,9 @@ private:
 
 		std::vector<char> buffer(fileSize);
 
-		if (!inputFile.read(buffer.data(), fileSize)) {
-			std::cerr << "Грешка при четене на файла." << std::endl;
+		if (!inputFile.read(buffer.data(), fileSize)) 
+		{
+			std::cerr << "Error on read form file. " << std::endl;
 			return;
 		}
 
@@ -397,7 +396,7 @@ public:
 	void serializeToArchive(const std::string& fileName) {
 		std::ofstream outStream(fileName, std::ios::binary);
 		if (!outStream.is_open()) {
-			std::cerr << "Неуспешно записване на архива" << std::endl;
+			std::cerr << "Error on store to archive." << std::endl;
 			return;
 		}
 
@@ -419,7 +418,7 @@ public:
 
 		std::ifstream inStream(fileName, std::ios::binary);
 		if (!inStream.is_open()) {
-			std::cerr << "Неуспешно отваряне на архива" << std::endl;
+			std::cerr << "Error on open archive. " << std::endl;
 			return;
 		}
 
